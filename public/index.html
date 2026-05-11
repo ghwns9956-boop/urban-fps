@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Urban FPS</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- Load Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/PointerLockControls.js"></script>
+    <!-- Load Socket.io -->
+    <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+    <div id="game-container"></div>
+
+    <!-- UI Overlay -->
+    <div id="ui-layer">
+        <div id="crosshair">
+            <div class="line horizontal"></div>
+            <div class="line vertical"></div>
+        </div>
+        
+        <div id="health-bar-container">
+            <div id="health-bar"></div>
+            <div id="health-text">100</div>
+        </div>
+
+        <div id="ammo-container">
+            <div id="ammo-text">30 / 30</div>
+            <div id="weapon-name">ASSAULT RIFLE</div>
+        </div>
+
+        <div id="kill-log-container" style="display: none;">
+            <table id="kill-log-table">
+                <thead>
+                    <tr><th>Killer</th><th>Weapon</th><th>Victim</th></tr>
+                </thead>
+                <tbody id="kill-log-body">
+                </tbody>
+            </table>
+        </div>
+        
+        <div id="hit-marker" style="display: none;"></div>
+        <div id="damage-overlay"></div>
+    </div>
+
+    <!-- Screens -->
+    <div id="blocker">
+        <div id="instructions">
+            <span style="font-size:36px">Click to play</span>
+            <br /><br />
+            Move: WASD<br/>
+            Shoot: Left Click<br/>
+            Aim (ADS): Right Click<br/>
+            Reload: R<br/>
+            Scoreboard/Kill Log: TAB
+        </div>
+    </div>
+
+    <div id="respawn-screen" style="display: block;">
+        <h1>URBAN COMBAT</h1>
+        <div id="respawn-timer-container" style="display: none;">
+            <h2>RESPAWNING IN...</h2>
+            <div id="respawn-bar"><div id="respawn-progress"></div></div>
+        </div>
+        <div id="weapon-select">
+            <h2>SELECT YOUR WEAPON</h2>
+            <div class="weapon-cards">
+                <div class="weapon-card" data-weapon="ar">
+                    <h3>Assault Rifle</h3>
+                    <p>Full-Auto. Reliable at medium range.</p>
+                </div>
+                <div class="weapon-card" data-weapon="pistol">
+                    <h3>Pistol</h3>
+                    <p>Semi-Auto. High mobility.</p>
+                </div>
+                <div class="weapon-card" data-weapon="sniper">
+                    <h3>Sniper Rifle</h3>
+                    <p>Bolt-Action. High damage, 3x Zoom.</p>
+                </div>
+                <div class="weapon-card" data-weapon="shotgun">
+                    <h3>Shotgun</h3>
+                    <p>Pump-Action. Devastating up close.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/models.js"></script>
+    <script src="js/weapons.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/game.js"></script>
+</body>
+</html>
