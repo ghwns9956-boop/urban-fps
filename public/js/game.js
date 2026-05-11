@@ -10,6 +10,8 @@ const otherNPCsMeshes = {};
 let isDead = true;
 let localWeaponGroup;
 let weaponKickback = 0;
+const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
 
 // Movement state
 let moveForward = false;
@@ -35,6 +37,7 @@ function init() {
     // Camera setup
     camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
     camera.position.y = 1.6; // Eye level
+    camera.rotation.order = 'YXZ';
     scene.add(camera); // Must add camera to scene to see children (FPV weapon)
 
     weaponController = new WeaponController(camera, ui, socket);
@@ -44,23 +47,51 @@ function init() {
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.getElementById('game-container').appendChild(renderer.domElement);
 
-    // Controls
-    controls = new THREE.PointerLockControls(camera, document.body);
-    
-    document.getElementById('instructions').addEventListener('click', () => {
-        if (!isDead) controls.lock();
-    });
+    if (isMobile) {
+        document.getElementById('landscape-overlay').classList.add('mobile-active');
+        document.getElementById('mobile-controls').style.display = 'block';
+        document.getElementById('blocker').style.display = 'none'; // hide PC blocker
 
-    controls.addEventListener('lock', () => {
-        ui.blocker.style.display = 'none';
-    });
+        controls = {
+            isLocked: false,
+            lock: function() { this.isLocked = true; },
+            unlock: function() { this.isLocked = false; },
+            moveForward: function(distance) {
+                const vec = new THREE.Vector3(0, 0, -1);
+                vec.applyQuaternion(camera.quaternion);
+                vec.y = 0;
+                vec.normalize();
+                camera.position.addScaledVector(vec, distance);
+            },
+            moveRight: function(distance) {
+                const vec = new THREE.Vector3(1, 0, 0);
+                vec.applyQuaternion(camera.quaternion);
+                vec.y = 0;
+                vec.normalize();
+                camera.position.addScaledVector(vec, distance);
+            }
+        };
+        setupMobileInput();
+    } else {
+        // Controls for PC
+        controls = new THREE.PointerLockControls(camera, document.body);
+        
+        document.getElementById('instructions').addEventListener('click', () => {
+            if (!isDead) controls.lock();
+        });
 
-    controls.addEventListener('unlock', () => {
-        if (!isDead) ui.blocker.style.display = 'flex';
-    });
+        controls.addEventListener('lock', () => {
+            ui.blocker.style.display = 'none';
+        });
+
+        controls.addEventListener('unlock', () => {
+            if (!isDead) ui.blocker.style.display = 'flex';
+        });
+        
+        setupInput(); // PC Input
+    }
 
     buildCityMap();
-    setupInput();
     setupNetworking();
 
     window.addEventListener('resize', onWindowResize);
@@ -129,6 +160,152 @@ function buildCityMap() {
         
         scene.add(mesh);
     }
+}
+
+function setupMobileInput() {
+    let touchLookId = null;
+    let touchMoveId = null;
+    let joystickStart = {x: 0, y: 0};
+    const euler = new THREE.Euler(0, 0, 0, 'YXZ');
+    const PI_2 = Math.PI / 2;
+
+    const joystickZone = document.getElementById('joystick-zone');
+    const joystickKnob = document.getElementById('joystick-knob');
+    
+    document.addEventListener('touchstart', handleTouch, {passive: false});
+    document.addEventListener('touchmove', handleTouchMove, {passive: false});
+    document.addEventListener('touchend', handleTouchEnd, {passive: false});
+
+    function handleTouch(e) {
+        if (e.target.classList.contains('mobile-btn') || e.target.closest('.weapon-card')) return;
+        
+        for (let i=0; i<e.changedTouches.length; i++) {
+            const t = e.changedTouches[i];
+            if (t.clientX < window.innerWidth / 2 && touchMoveId === null) {
+                // Left side: Joystick
+                touchMoveId = t.identifier;
+                joystickStart.x = t.clientX;
+                joystickStart.y = t.clientY;
+                joystickZone.style.left = (t.clientX - 75) + 'px';
+                joystickZone.style.top = (t.clientY - 75) + 'px';
+                joystickZone.style.bottom = 'auto';
+                joystickKnob.style.transform = `translate(-50%, -50%)`;
+            } else if (t.clientX >= window.innerWidth / 2 && touchLookId === null) {
+                // Right side: Look
+                touchLookId = t.identifier;
+                lastTouchX = t.clientX;
+                lastTouchY = t.clientY;
+            }
+        }
+    }
+
+    let lastTouchX = 0, lastTouchY = 0;
+
+    function handleTouchMove(e) {
+        if (e.target.id === 'weapon-select' || e.target.closest('.weapon-cards')) return; // allow scrolling weapon cards
+        e.preventDefault(); // Prevent scrolling
+        for (let i=0; i<e.changedTouches.length; i++) {
+            const t = e.changedTouches[i];
+            if (t.identifier === touchMoveId) {
+                // Move logic
+                let dx = t.clientX - joystickStart.x;
+                let dy = t.clientY - joystickStart.y;
+                const distance = Math.sqrt(dx*dx + dy*dy);
+                const maxDist = 50;
+                
+                if (distance > maxDist) {
+                    dx = (dx / distance) * maxDist;
+                    dy = (dy / distance) * maxDist;
+                }
+                joystickKnob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+                
+                // Map to WASD analog-like
+                moveRight = dx / maxDist > 0.2;
+                moveLeft = dx / maxDist < -0.2;
+                moveBackward = dy / maxDist > 0.2;
+                moveForward = dy / maxDist < -0.2;
+                
+            } else if (t.identifier === touchLookId) {
+                if (!isDead && controls.isLocked) {
+                    // Look logic
+                    const movementX = t.clientX - lastTouchX;
+                    const movementY = t.clientY - lastTouchY;
+                    lastTouchX = t.clientX;
+                    lastTouchY = t.clientY;
+
+                    // Apply sensitivity multiplier
+                    const sensitivity = weaponController.isADS ? 0.002 : 0.005;
+
+                    euler.setFromQuaternion(camera.quaternion);
+                    euler.y -= movementX * sensitivity;
+                    euler.x -= movementY * sensitivity;
+                    euler.x = Math.max(-PI_2, Math.min(PI_2, euler.x));
+                    camera.quaternion.setFromEuler(euler);
+                }
+            }
+        }
+    }
+
+    function handleTouchEnd(e) {
+        for (let i=0; i<e.changedTouches.length; i++) {
+            const t = e.changedTouches[i];
+            if (t.identifier === touchMoveId) {
+                touchMoveId = null;
+                moveForward = moveBackward = moveLeft = moveRight = false;
+                joystickKnob.style.transform = `translate(-50%, -50%)`;
+                joystickZone.style.left = '20px';
+                joystickZone.style.bottom = '20px';
+                joystickZone.style.top = 'auto';
+            } else if (t.identifier === touchLookId) {
+                touchLookId = null;
+            }
+        }
+    }
+
+    // Buttons
+    let fireLoop = null;
+    const btnFire = document.getElementById('btn-fire');
+    btnFire.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        if (isDead || !controls.isLocked) return;
+        if (weaponController.weapon.isAutomatic) {
+            fireLoop = setInterval(() => {
+                if (!weaponController.shoot(scene, {}, otherPlayersMeshes, otherNPCsMeshes)) {
+                    clearInterval(fireLoop);
+                } else {
+                    weaponKickback = 0.1;
+                }
+            }, 50);
+        } else {
+            if (weaponController.shoot(scene, {}, otherPlayersMeshes, otherNPCsMeshes)) {
+                weaponKickback = 0.1;
+            }
+        }
+    });
+    btnFire.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        if (fireLoop) clearInterval(fireLoop);
+    });
+    // Add touchcancel to stop firing if finger slides off the button
+    btnFire.addEventListener('touchcancel', (e) => {
+        if (fireLoop) clearInterval(fireLoop);
+    });
+
+    const btnAds = document.getElementById('btn-ads');
+    btnAds.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        if (!isDead && controls.isLocked) weaponController.setADS(true);
+    });
+    btnAds.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        weaponController.setADS(false);
+    });
+
+    const btnReload = document.getElementById('btn-reload');
+    btnReload.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        if (!isDead && controls.isLocked) weaponController.reload();
+    });
 }
 
 function setupInput() {
