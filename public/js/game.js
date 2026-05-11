@@ -6,6 +6,7 @@ let ui;
 let weaponController;
 
 const otherPlayersMeshes = {};
+const otherNPCsMeshes = {};
 let isDead = true;
 
 // Movement state
@@ -144,7 +145,7 @@ function setupInput() {
             // Handle automatic weapons
             if (weaponController.weapon.isAutomatic) {
                 const fireLoop = setInterval(() => {
-                    if (!weaponController.shoot(scene, {}, otherPlayersMeshes)) {
+                    if (!weaponController.shoot(scene, {}, otherPlayersMeshes, otherNPCsMeshes)) {
                         clearInterval(fireLoop);
                     }
                 }, 50);
@@ -155,7 +156,7 @@ function setupInput() {
                 };
                 document.addEventListener('mouseup', stopFire);
             } else {
-                weaponController.shoot(scene, {}, otherPlayersMeshes);
+                weaponController.shoot(scene, {}, otherPlayersMeshes, otherNPCsMeshes);
             }
         } else if (event.button === 2) { // Right click
             weaponController.setADS(true);
@@ -251,12 +252,49 @@ function setupNetworking() {
             delete otherPlayersMeshes[id];
         }
     });
+
+    // NPC Networking
+    socket.on('currentNPCs', (npcs) => {
+        for (let id in npcs) {
+            if (!npcs[id].isDead) {
+                addNPC(npcs[id]);
+            }
+        }
+    });
+
+    socket.on('newNPC', (npcData) => {
+        if (!npcData.isDead) addNPC(npcData);
+    });
+
+    socket.on('npcUpdate', (npcs) => {
+        for (let id in npcs) {
+            const npcData = npcs[id];
+            const mesh = otherNPCsMeshes[id];
+            if (mesh && !npcData.isDead) {
+                mesh.position.set(npcData.x, npcData.y, npcData.z);
+                mesh.rotation.y = npcData.rotationY;
+                mesh.visible = true;
+            } else if (npcData.isDead && mesh) {
+                mesh.visible = false;
+            }
+        }
+    });
+
+    socket.on('npcKilled', (data) => {
+        const killerName = data.killerId === socket.id ? 'You' : data.killerId.substring(0, 4);
+        ui.addKillLog(killerName, data.weapon, 'Zombie Bot', data.isHeadshot);
+        
+        const mesh = otherNPCsMeshes[data.targetId];
+        if (mesh) {
+            mesh.visible = false;
+        }
+    });
 }
 
 function addOtherPlayer(playerData) {
-    const playerGroup = Models.createHumanoid();
+    const playerGroup = Models.createHumanoid(false);
     playerGroup.position.set(playerData.x, playerData.y, playerData.z);
-    playerGroup.userData = { id: playerData.id };
+    playerGroup.userData = { id: playerData.id, isNPC: false };
     
     // Add their weapon
     const weaponModel = Models.createWeaponModel(playerData.weapon);
@@ -264,6 +302,19 @@ function addOtherPlayer(playerData) {
 
     scene.add(playerGroup);
     otherPlayersMeshes[playerData.id] = playerGroup;
+}
+
+function addNPC(npcData) {
+    const npcGroup = Models.createHumanoid(true); // true = isNPC -> Red clothing
+    npcGroup.position.set(npcData.x, npcData.y, npcData.z);
+    npcGroup.userData = { id: npcData.id, isNPC: true };
+    
+    // Add knife
+    const weaponModel = Models.createWeaponModel('knife');
+    npcGroup.weaponPivot.add(weaponModel);
+
+    scene.add(npcGroup);
+    otherNPCsMeshes[npcData.id] = npcGroup;
 }
 
 function onWindowResize() {

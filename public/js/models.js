@@ -7,12 +7,12 @@ const Models = {
     gunMetal: 0x333333,
     woodColor: 0x5c4033,
 
-    createHumanoid: function() {
+    createHumanoid: function(isNPC = false) {
         const group = new THREE.Group();
         
         // Materials
         const skinMat = new THREE.MeshLambertMaterial({ color: this.skinColor });
-        const clothMat = new THREE.MeshLambertMaterial({ color: this.clothColor });
+        const clothMat = new THREE.MeshLambertMaterial({ color: isNPC ? 0xaa2222 : this.clothColor });
         
         // Head
         const headGeo = new THREE.BoxGeometry(0.8, 0.8, 0.8);
@@ -122,6 +122,14 @@ const Models = {
             const stock = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.15, 0.4), woodMat);
             stock.position.set(0, -0.05, -0.4);
             weaponGroup.add(receiver, barrel, pump, stock);
+        } else if (type === 'knife') {
+            // Knife
+            const handle = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.08, 0.2), woodMat);
+            const blade = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.1, 0.3), metalMat);
+            blade.position.set(0, 0, 0.25);
+            // Angle the knife down a bit for a stabbing pose
+            weaponGroup.rotation.x = -Math.PI / 4;
+            weaponGroup.add(handle, blade);
         }
 
         return weaponGroup;

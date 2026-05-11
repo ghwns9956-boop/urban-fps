@@ -123,7 +123,7 @@ class WeaponController {
         }
     }
 
-    shoot(scene, playersData, otherPlayersMeshes) {
+    shoot(scene, playersData, otherPlayersMeshes, otherNPCsMeshes = {}) {
         if (this.isReloading) {
             // Interrupt shotgun reload if click
             if (this.weapon.reloadType === 'shell' && this.ammo > 0) {
@@ -168,11 +168,14 @@ class WeaponController {
             // Raycast
             this.raycaster.set(origin, direction);
             
-            // Check collisions with players
-            // We need to raycast against the hitboxes of other players
+            // Check collisions with players and NPCs
+            // We need to raycast against the hitboxes of other players and NPCs
             const intersectables = [];
             for (let id in otherPlayersMeshes) {
                 intersectables.push(otherPlayersMeshes[id]);
+            }
+            for (let id in otherNPCsMeshes) {
+                intersectables.push(otherNPCsMeshes[id]);
             }
             
             // Also add environment meshes if we had them here, but for now just players
@@ -202,7 +205,8 @@ class WeaponController {
                     this.socket.emit('hit', {
                         targetId: hitMesh.userData.id,
                         damage: damage,
-                        isHeadshot: isHeadshot
+                        isHeadshot: isHeadshot,
+                        isNPC: hitMesh.userData.isNPC || false
                     });
 
                     this.ui.showHitMarker(isHeadshot);
