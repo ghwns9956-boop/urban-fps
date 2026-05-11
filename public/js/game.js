@@ -132,6 +132,9 @@ function buildCityMap() {
 }
 
 function setupInput() {
+    // Prevent right-click menu from appearing when aiming down sights
+    document.addEventListener('contextmenu', event => event.preventDefault());
+
     document.addEventListener('keydown', (event) => {
         switch (event.code) {
             case 'KeyW': moveForward = true; break;
