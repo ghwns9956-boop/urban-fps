@@ -8,6 +8,8 @@ let weaponController;
 const otherPlayersMeshes = {};
 const otherNPCsMeshes = {};
 let isDead = true;
+let localWeaponGroup;
+let weaponKickback = 0;
 
 // Movement state
 let moveForward = false;
@@ -33,6 +35,7 @@ function init() {
     // Camera setup
     camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
     camera.position.y = 1.6; // Eye level
+    scene.add(camera); // Must add camera to scene to see children (FPV weapon)
 
     weaponController = new WeaponController(camera, ui, socket);
 
@@ -67,12 +70,30 @@ function init() {
         card.addEventListener('click', () => {
             const weaponType = card.getAttribute('data-weapon');
             weaponController.setWeapon(weaponType);
+            updateLocalWeaponModel(weaponType);
             ui.hideRespawnScreen();
             
             // Ask server to spawn us
             socket.emit('spawn', weaponType);
+            
+            // Request pointer lock immediately after a short delay
+            setTimeout(() => { controls.lock(); }, 100);
         });
     });
+}
+
+function updateLocalWeaponModel(weaponType) {
+    if (localWeaponGroup) {
+        camera.remove(localWeaponGroup);
+    }
+    localWeaponGroup = Models.createWeaponModel(weaponType);
+    // Position it bottom right relative to camera
+    localWeaponGroup.position.set(0.3, -0.3, -0.6);
+    
+    // Scale it down slightly so it fits nicely on screen
+    localWeaponGroup.scale.set(0.5, 0.5, 0.5);
+    
+    camera.add(localWeaponGroup);
 }
 
 function buildCityMap() {
@@ -147,6 +168,8 @@ function setupInput() {
                 const fireLoop = setInterval(() => {
                     if (!weaponController.shoot(scene, {}, otherPlayersMeshes, otherNPCsMeshes)) {
                         clearInterval(fireLoop);
+                    } else {
+                        weaponKickback = 0.1;
                     }
                 }, 50);
                 
@@ -156,7 +179,9 @@ function setupInput() {
                 };
                 document.addEventListener('mouseup', stopFire);
             } else {
-                weaponController.shoot(scene, {}, otherPlayersMeshes, otherNPCsMeshes);
+                if (weaponController.shoot(scene, {}, otherPlayersMeshes, otherNPCsMeshes)) {
+                    weaponKickback = 0.1;
+                }
             }
         } else if (event.button === 2) { // Right click
             weaponController.setADS(true);
@@ -360,6 +385,35 @@ function animate() {
             rotationY: camera.rotation.y,
             pitch: camera.rotation.x
         });
+
+        // Weapon bobbing, kickback, and ADS positioning
+        if (localWeaponGroup) {
+            // Kickback recovery
+            if (weaponKickback > 0) {
+                weaponKickback -= delta * 0.5; // recover speed
+                if (weaponKickback < 0) weaponKickback = 0;
+            }
+            
+            // Apply Kickback
+            localWeaponGroup.position.z = -0.6 + weaponKickback;
+            localWeaponGroup.rotation.x = weaponKickback * 0.5;
+            
+            // Move weapon to center if ADS
+            if (weaponController.isADS) {
+                localWeaponGroup.position.x = 0;
+                localWeaponGroup.position.y = -0.15;
+            } else {
+                localWeaponGroup.position.x = 0.3;
+                
+                // Bobbing when moving (only hip fire)
+                if ((moveForward || moveBackward || moveLeft || moveRight)) {
+                    const bob = Math.sin(time * 0.01) * 0.02;
+                    localWeaponGroup.position.y = -0.3 + bob;
+                } else {
+                    localWeaponGroup.position.y = -0.3;
+                }
+            }
+        }
     }
 
     prevTime = time;
