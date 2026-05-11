@@ -3,7 +3,7 @@
 const Weapons = {
     ar: {
         name: 'ASSAULT RIFLE',
-        damage: 25,
+        damage: 12.5,
         fireRate: 100, // ms between shots
         magSize: 30,
         reloadTime: 2000,
@@ -15,7 +15,7 @@ const Weapons = {
     },
     pistol: {
         name: 'PISTOL',
-        damage: 35,
+        damage: 17.5,
         fireRate: 200,
         magSize: 12,
         reloadTime: 1200,
@@ -27,7 +27,8 @@ const Weapons = {
     },
     sniper: {
         name: 'SNIPER RIFLE',
-        damage: 100,
+        damage: 50,
+        headshotMultiplier: 2.0, // 50 * 2.0 = 100
         fireRate: 1500, // Bolt action delay
         magSize: 5,
         reloadTime: 3000,
@@ -39,7 +40,7 @@ const Weapons = {
     },
     shotgun: {
         name: 'SHOTGUN',
-        damage: 15, // per pellet
+        damage: 7.5, // per pellet
         pellets: 8,
         fireRate: 800, // Pump action delay
         magSize: 6,
@@ -200,7 +201,8 @@ class WeaponController {
                     const hitHeight = hit.point.y - hitMesh.position.y;
                     const isHeadshot = hitHeight > 1.2; // approx head height
                     
-                    const damage = isHeadshot ? this.weapon.damage * 1.5 : this.weapon.damage;
+                    const multiplier = this.weapon.headshotMultiplier || 1.5;
+                    const damage = isHeadshot ? this.weapon.damage * multiplier : this.weapon.damage;
                     
                     this.socket.emit('hit', {
                         targetId: hitMesh.userData.id,

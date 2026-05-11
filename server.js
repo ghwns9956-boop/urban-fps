@@ -30,8 +30,8 @@ function spawnNPC() {
         y: spawn.y,
         z: spawn.z,
         rotationY: 0,
-        health: 100,
-        speed: 8.0, // units per second
+        health: 25,
+        speed: 2.5, // units per second (very slow)
         lastAttackTime: 0,
         isDead: false
     };
@@ -77,10 +77,11 @@ function updateNPCs() {
             // Rotation
             npc.rotationY = Math.atan2(dx, dz);
 
-            if (minTargetDist > 1.5) {
+            if (minTargetDist > 1.5 && minTargetDist < 25.0) {
+                // Chase if within aggro radius (25 units)
                 npc.x += (dx / minTargetDist) * npc.speed * dt;
                 npc.z += (dz / minTargetDist) * npc.speed * dt;
-            } else {
+            } else if (minTargetDist <= 1.5) {
                 // Melee Attack!
                 if (now - npc.lastAttackTime > 1000) { // 1 second cooldown
                     npc.lastAttackTime = now;
